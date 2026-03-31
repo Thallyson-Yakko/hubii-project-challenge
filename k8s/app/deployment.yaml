@@ -1,0 +1,68 @@
+apiVersion: apps/v1    #Sempre vai ser apps/v1
+kind: Deployment         #Tipo do manisfesto
+metadata:
+  labels:
+    app: app
+  name: hubii-app
+  namespace: app
+spec:             #caracteristicas do deployment
+  replicas: 2
+  selector:       #Controla os Pods referentes a essa aplicação
+    matchLabels:  #Todos os Pods que tiverem a mesma label é esse deployment que vai cuidar
+      app: app
+  strategy:     #Estrategias de deployment
+      type: RollingUpdate  #Estrategia de atualização
+      rollingUpdate:
+          maxSurge: 1     # Pode ter até 1 pod a mais do que eu pedi
+          maxUnavailable: 1  #Vai atualizar de 2 em 2
+  template:       #Template criado para o POD
+    metadata:
+      labels:
+        app: app
+    spec:          # Caracteristica agora do meu POD/Container
+      containers:
+      - image: thallysonyakko/hubii_app:1.1
+        imagePullPolicy: IfNotPresent
+        name: hubii-app
+        env:
+          - name: APP_ENV
+            value: "Production"
+
+       # Postgres
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: db-secret
+                key: DB_USER
+
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-secret
+                key: DB_PASSWORD
+
+        # Redis
+          - name: REDIS_HOST
+            value: "redis-service"
+          - name: REDIS_PORT
+            value: "6379"     
+        resources:     #Resources do meu POD e seus limits
+            limits:
+              cpu: "1.0"
+              memory: "256Mi"
+            requests:
+              cpu: "0.3"
+              memory: "64Mi"
+        livenessProbe:       # Tipo de helthcheck
+          httpGet:
+            path: /          #Pasta raiz
+            port: 8080
+          initialDelaySeconds: 10    #Tempo que vai esperar até testar a primeira probes
+          periodSeconds: 10     # De quanto em quanto tempo ele vai testar
+          timeoutSeconds: 5
+          failureThreshold: 3    # Após 3 vezes ele vai tentar restartar o POD
+        readinessProbe: # Onde definimos a nossa probe de prontidão
+          httpGet: # O tipo de teste que iremos executar, neste caso, iremos executar um teste HTTP
+            path: / # O caminho que iremos testar
+            port: 8080 # A porta que iremos testar
+          initialDelaySeconds: 10 # O tempo que iremos esperar para executar a primeira vez a probe
